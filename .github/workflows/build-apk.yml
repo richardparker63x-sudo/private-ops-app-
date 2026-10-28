@@ -1,0 +1,45 @@
+
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Create Android project
+        run: flutter create --org com.cyberpoka --project-name private_ops private_ops_app
+
+      - name: Prepare app files
+        run: |
+          cp main.dart private_ops_app/lib/main.dart
+          mkdir -p private_ops_app/assets/app
+          cp index.html private_ops_app/assets/app/index.html
+          cp pubspec.yaml private_ops_app/pubspec.yaml
+          python3 -c "from pathlib import Path; p=Path('private_ops_app/android/app/src/main/AndroidManifest.xml'); s=p.read_text(); s=s.replace('<application', '<uses-permission android:name=\"android.permission.INTERNET\"/>\n    <application android:usesCleartextTraffic=\"true\"', 1); p.write_text(s)"
+
+      - name: Install dependencies
+        working-directory: private_ops_app
+        run: flutter pub get
+
+      - name: Build APK
+        working-directory: private_ops_app
+        run: flutter build apk --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-ops-android-apk
+          path: private_ops_app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
